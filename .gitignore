@@ -15,3 +15,6 @@ db.sqlite3
 
 # macOS 固有のファイル
 .DS_Store
+
+# メモ
+MEMO.md
