@@ -20,3 +20,13 @@ class ProductSearchForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={"placeholder": "商品の検索"}),
     )
+
+
+class ProductNumForm(forms.Form):
+    num = forms.IntegerField(
+        label="数量",
+        max_value=500,
+        min_value=1,
+        required=True,
+        initial=1,
+    )

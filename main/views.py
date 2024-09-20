@@ -1,4 +1,3 @@
-import keyword
 from typing import Any
 
 from django.contrib.auth import login
@@ -6,10 +5,11 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView, LogoutView
 from django.db.models.query import QuerySet
 from django.urls import reverse_lazy
+from django.views.generic.detail import DetailView
 from django.views.generic.edit import CreateView
 from django.views.generic.list import ListView
 
-from .forms import LoginForm, ProductSearchForm, SignUpForm
+from .forms import LoginForm, ProductNumForm, ProductSearchForm, SignUpForm
 from .models import Product
 
 
@@ -63,4 +63,13 @@ class ProductList(ListView):
         context["form"] = form
         if form.is_valid():
             context["keyword"] = form.cleaned_data.get("keyword")
+        return context
+
+
+class ProductDetail(DetailView):
+    model = Product
+
+    def get_context_data(self, **kwargs) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["form"] = ProductNumForm()
         return context
