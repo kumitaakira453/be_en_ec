@@ -1,18 +1,21 @@
 from typing import Any
-from urllib import request
 
+import stripe
+import stripe.error
+from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView, LogoutView
 from django.db.models.query import QuerySet
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
+from django.views.generic.base import View
 from django.views.generic.detail import DetailView
 from django.views.generic.edit import CreateView
 from django.views.generic.list import ListView
 
 from .forms import LoginForm, ProductNumForm, ProductSearchForm, SignUpForm
-from .models import Product
+from .models import OrderHistroy, Product
 
 
 class SignUpView(CreateView):
@@ -109,6 +112,12 @@ class Cart(LoginRequiredMixin, ListView):
             context["total_price"] = sum(
                 self.product_net(product, num_dict) for product in self.products
             )
+            context["num_dict"] = num_dict
+            context["total_num"] = sum(num_dict.values())
+            context["data_key"] = settings.STRIPE_PUBLISHABLE_KEY
+        else:
+            context["total_price"] = 0
+            context["total_num"] = 0
         return context
 
     def get_queryset(self):
@@ -135,3 +144,51 @@ class Cart(LoginRequiredMixin, ListView):
         self.request.session["cart"] = cart
         self.request.session["num_dict"] = num_dict
         return redirect("cart")
+
+
+class CheckoutView(View):
+    def post(self, *args, **kwargs):
+        stripe.api_key = settings.STRIPE_API_KEY
+
+        token = self.request.POST["stripeToken"]
+
+        try:
+            stripe.Charge.create(
+                amount=int(self.request.POST["price"]),
+                currency="jpy",
+                source=token,
+                description="BeEn_ec",
+            )
+        except stripe.error.CardError:
+            return render(
+                self.request,
+                "main/error.html",
+                {
+                    "message": "決済に失敗しました。",
+                },
+            )
+        purchased_products = self.request.session["cart"]
+        num_dict = self.request.session["num_dict"]
+
+        # 決済終了したいのでsessionを削除する
+        del self.request.session["cart"]
+        del self.request.session["num_dict"]
+
+        for product_pk in purchased_products:
+            product = Product.objects.get(pk=product_pk)
+            OrderHistroy.objects.create(
+                user=self.request.user,
+                product=product,
+                price=product.price,
+                num=num_dict[str(product_pk)],
+            )
+        return render(
+            self.request,
+            "main/complete.html",
+            {
+                "products": Product.objects.filter(pk__in=purchased_products).order_by(
+                    "pk"
+                ),
+                "num_dict": num_dict,
+            },
+        )
